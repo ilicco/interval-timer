@@ -175,7 +175,7 @@
   var WORK_SECONDS = 60;
   var REST_SECONDS = 5;
   var PRESTART_SECONDS = 3;
-  var APP_VERSION = "1.4";
+  var APP_VERSION = "1.5";
   // -----------------------------------
 
   // Build the sequence: work, rest, work, rest, ..., work (no trailing rest)
@@ -204,7 +204,7 @@
   var remainingMs = 0;  // used while paused
   var tickHandle = null;
   var wakeLock = null;
-  var lastCountdownSecond = null;
+  var countdownAnnounced = false;
   var pausedPhase = null; // "starting" or "running" — which phase we were in when paused
 
   function fmt(totalSeconds) {
@@ -287,7 +287,7 @@
     el.startBtn.disabled = false;
   }
 
-  var COUNTDOWN_WORDS = { 3: "3", 2: "2", 1: "1" };
+  var COUNTDOWN_PHRASE = "Three, two, one";
 
   function primeSpeech() {
     // Must run synchronously inside a real user gesture (the Start tap) or
@@ -320,9 +320,13 @@
     try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}
   }
 
-  function countdownSpeak(n) {
-    speak(COUNTDOWN_WORDS[n]);
-    vibrate(40);
+  function countdownSpeak() {
+    // Spoken once as a single connected phrase, not three isolated-word
+    // utterances — every isolated form of "two" ("Two", "Too", digit "2")
+    // consistently rendered as "do" on this voice; saying it inline in a
+    // natural phrase sidesteps whatever that isolated-word quirk is.
+    speak(COUNTDOWN_PHRASE);
+    vibrate([40, 100, 40, 100, 40]);
   }
 
   function announceStep() {
@@ -378,9 +382,9 @@
       return;
     }
     var remainSecCeil = Math.ceil(remain / 1000);
-    if (remainSecCeil <= 3 && remainSecCeil >= 1 && remainSecCeil !== lastCountdownSecond) {
-      lastCountdownSecond = remainSecCeil;
-      countdownSpeak(remainSecCeil);
+    if (remainSecCeil <= 3 && !countdownAnnounced) {
+      countdownAnnounced = true;
+      countdownSpeak();
     }
     render();
     scheduleTick();
@@ -402,7 +406,7 @@
   function beginStep() {
     var step = currentStep();
     endAt = Date.now() + step.seconds * 1000;
-    lastCountdownSecond = null;
+    countdownAnnounced = false;
     render();
     scheduleTick();
   }
@@ -412,7 +416,7 @@
     if (state === "idle") {
       stepIndex = 0;
       state = "starting";
-      lastCountdownSecond = null;
+      countdownAnnounced = false;
       requestWakeLock();
       endAt = Date.now() + PRESTART_SECONDS * 1000;
       render();
