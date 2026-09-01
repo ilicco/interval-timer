@@ -1,6 +1,6 @@
 // Bump this when index.html or voice.html changes so the new version gets cached.
-var CACHE_NAME = "interval-timer-v7";
-var ASSETS = ["./", "./index.html", "./voice.html"];
+var CACHE_NAME = "interval-timer-v8";
+var ASSETS = ["./", "./index.html", "./voice.html", "./exercises.jpg"];
 
 self.addEventListener("install", function (event) {
   self.skipWaiting();

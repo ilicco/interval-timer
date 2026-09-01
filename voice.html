@@ -66,11 +66,22 @@
 
   #middle {
     flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     width: 100%;
+  }
+
+  #exercises-img {
+    flex-shrink: 0;
+    max-width: 100%;
+    max-height: 16dvh;
+    width: auto;
+    object-fit: contain;
+    border-radius: 12px;
+    margin: 4px 0;
   }
 
   #label {
@@ -149,6 +160,8 @@
     <div id="next-preview">&nbsp;</div>
     <div id="time">00:00</div>
   </div>
+
+  <img id="exercises-img" src="exercises.jpg" alt="Exercise reference chart">
 
   <div id="controls">
     <button id="startBtn">Start</button>
