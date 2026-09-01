@@ -288,10 +288,17 @@
 
   function speak(text, rate) {
     try {
-      speechSynthesis.cancel(); // stop any still-playing line so the new one is heard clearly
       var utter = new SpeechSynthesisUtterance(text);
       utter.rate = rate || 1;
-      speechSynthesis.speak(utter);
+      if (speechSynthesis.speaking || speechSynthesis.pending) {
+        // Cancelling and immediately speaking clips the start of the next
+        // word on WebKit (e.g. "Two" comes out sounding like "do") — a
+        // short gap after cancel avoids that.
+        speechSynthesis.cancel();
+        setTimeout(function () { speechSynthesis.speak(utter); }, 30);
+      } else {
+        speechSynthesis.speak(utter);
+      }
     } catch (e) {}
   }
 
