@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b0d12">
+<title>Interval Timer (Voice)</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⏱️</text></svg>">
+<style>
+  :root {
+    --bg: #0b0d12;
+    --bg-rest: #1a1005;
+    --bg-done: #051a0d;
+    --fg: #f5f6f8;
+    --accent: #4da3ff;
+    --accent-rest: #ffb020;
+    --accent-done: #35d67c;
+    --muted: #8a93a6;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overscroll-behavior: none;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: background 0.4s ease;
+  }
+
+  body.mode-rest { background: var(--bg-rest); }
+  body.mode-done { background: var(--bg-done); }
+
+  #app {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+    text-align: center;
+  }
+
+  #progress {
+    font-size: clamp(14px, 4vw, 20px);
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    padding-top: 8px;
+    min-height: 1.4em;
+  }
+
+  #middle {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+  }
+
+  #label {
+    font-size: clamp(32px, 11vw, 60px);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--accent);
+    transition: color 0.4s ease;
+    margin-bottom: 8px;
+    padding: 0 8px;
+  }
+
+  body.mode-rest #label { color: var(--accent-rest); }
+  body.mode-done #label { color: var(--accent-done); }
+
+  #next-preview {
+    font-size: clamp(14px, 4vw, 18px);
+    color: var(--muted);
+    min-height: 1.4em;
+    margin-bottom: 8px;
+  }
+
+  #time {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+    font-family: "SF Mono", ui-monospace, Menlo, monospace;
+    font-size: clamp(72px, 28vw, 220px);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--fg);
+    transition: color 0.4s ease;
+  }
+
+  body.mode-rest #time { color: var(--accent-rest); }
+  body.mode-done #time { color: var(--accent-done); }
+
+  #controls {
+    display: flex;
+    gap: 12px;
+    width: 100%;
+    max-width: 480px;
+    padding-bottom: 8px;
+  }
+
+  button {
+    flex: 1;
+    font-size: clamp(16px, 5vw, 20px);
+    font-weight: 600;
+    padding: 18px 12px;
+    border-radius: 16px;
+    border: none;
+    cursor: pointer;
+    color: var(--fg);
+    background: #232838;
+    transition: transform 0.1s ease, background 0.2s ease;
+  }
+
+  button:active { transform: scale(0.96); }
+
+  button#startBtn { background: var(--accent); color: #06121f; }
+  button#resetBtn { background: #3a2020; color: #ffd7d7; }
+  button:disabled { opacity: 0.35; cursor: default; }
+
+  #startBtn.is-pause { background: var(--accent-rest); color: #241400; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="progress">Ready</div>
+
+  <div id="middle">
+    <div id="label">Get Ready</div>
+    <div id="next-preview">&nbsp;</div>
+    <div id="time">00:00</div>
+  </div>
+
+  <div id="controls">
+    <button id="startBtn">Start</button>
+    <button id="resetBtn">Reset</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---- Edit your exercises here ----
+  var EXERCISES = [
+    "Lymphatic Hops",
+    "Body Wave",
+    "Arm Swings",
+    "Trunk Twists",
+    "Dead Arms",
+    "Golf Swings",
+    "Windmill",
+    "March Slap",
+    "Plié Squats"
+  ];
+  var WORK_SECONDS = 60;
+  var REST_SECONDS = 5;
+  var PRESTART_SECONDS = 3;
+  // -----------------------------------
+
+  // Build the sequence: work, rest, work, rest, ..., work (no trailing rest)
+  var sequence = [];
+  for (var i = 0; i < EXERCISES.length; i++) {
+    sequence.push({ type: "work", index: i, seconds: WORK_SECONDS });
+    if (i < EXERCISES.length - 1) {
+      sequence.push({ type: "rest", index: i, seconds: REST_SECONDS });
+    }
+  }
+
+  var el = {
+    progress: document.getElementById("progress"),
+    label: document.getElementById("label"),
+    nextPreview: document.getElementById("next-preview"),
+    time: document.getElementById("time"),
+    startBtn: document.getElementById("startBtn"),
+    resetBtn: document.getElementById("resetBtn"),
+    body: document.body
+  };
+
+  var state = "idle"; // idle | running | paused | done
+  var stepIndex = 0;
+  var endAt = 0;        // timestamp when current step ends
+  var remainingMs = 0;  // used while paused
+  var tickHandle = null;
+  var wakeLock = null;
+  var lastCountdownSecond = null;
+  var pausedPhase = null; // "starting" or "running" — which phase we were in when paused
+
+  function fmt(totalSeconds) {
+    var s = Math.max(0, Math.ceil(totalSeconds));
+    var m = Math.floor(s / 60);
+    var r = s % 60;
+    return (m < 10 ? "0" + m : m) + ":" + (r < 10 ? "0" + r : r);
+  }
+
+  function currentStep() {
+    return sequence[stepIndex];
+  }
+
+  function render() {
+    var step = currentStep();
+    el.body.classList.remove("mode-rest", "mode-done");
+
+    if (state === "idle") {
+      el.progress.textContent = "Ready — " + EXERCISES.length + " exercises";
+      el.label.textContent = "Get Ready";
+      el.nextPreview.textContent = EXERCISES[0];
+      el.time.textContent = fmt(WORK_SECONDS);
+      el.startBtn.textContent = "Start";
+      el.startBtn.classList.remove("is-pause");
+      return;
+    }
+
+    if (state === "done") {
+      el.body.classList.add("mode-done");
+      el.progress.textContent = "Complete";
+      el.label.textContent = "Workout Complete";
+      el.nextPreview.textContent = "Nice work.";
+      el.time.textContent = "00:00";
+      el.startBtn.textContent = "Start";
+      el.startBtn.classList.remove("is-pause");
+      el.startBtn.disabled = false;
+      return;
+    }
+
+    // running or paused
+    var remainSec;
+    if (state === "paused") {
+      remainSec = remainingMs / 1000;
+    } else {
+      remainSec = (endAt - Date.now()) / 1000;
+    }
+
+    var effectivePhase = state === "paused" ? pausedPhase : state;
+
+    if (effectivePhase === "starting") {
+      el.body.classList.add("mode-rest");
+      el.progress.textContent = "Get ready — " + EXERCISES.length + " exercises";
+      el.label.textContent = "Get Ready";
+      el.nextPreview.textContent = "First: " + EXERCISES[0];
+      el.time.textContent = fmt(remainSec);
+      el.startBtn.textContent = state === "paused" ? "Resume" : "Pause";
+      el.startBtn.classList.toggle("is-pause", state === "paused");
+      el.startBtn.disabled = false;
+      return;
+    }
+
+    if (step.type === "work") {
+      el.progress.textContent = "Exercise " + (step.index + 1) + " of " + EXERCISES.length;
+      el.label.textContent = EXERCISES[step.index];
+      var next = step.index < EXERCISES.length - 1 ? "Next: " + EXERCISES[step.index + 1] : "Last one!";
+      el.nextPreview.textContent = next;
+    } else {
+      el.body.classList.add("mode-rest");
+      el.progress.textContent = "Rest";
+      el.label.textContent = "Rest";
+      el.nextPreview.textContent = "Next: " + EXERCISES[step.index + 1];
+    }
+
+    el.time.textContent = fmt(remainSec);
+    el.startBtn.textContent = state === "paused" ? "Resume" : "Pause";
+    el.startBtn.classList.toggle("is-pause", state === "paused");
+    el.startBtn.disabled = false;
+  }
+
+  var COUNTDOWN_WORDS = { 3: "Three", 2: "Two", 1: "One" };
+
+  function primeSpeech() {
+    // Must run synchronously inside a real user gesture (the Start tap) or
+    // iOS Safari will silently drop every utterance for the rest of the page's life.
+    try {
+      var warm = new SpeechSynthesisUtterance(" ");
+      warm.volume = 0;
+      speechSynthesis.speak(warm);
+    } catch (e) {}
+  }
+
+  function speak(text, rate) {
+    try {
+      speechSynthesis.cancel(); // stop any still-playing line so the new one is heard clearly
+      var utter = new SpeechSynthesisUtterance(text);
+      utter.rate = rate || 1;
+      speechSynthesis.speak(utter);
+    } catch (e) {}
+  }
+
+  function vibrate(pattern) {
+    try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}
+  }
+
+  function countdownSpeak(n) {
+    speak(COUNTDOWN_WORDS[n], 1.1);
+    vibrate(40);
+  }
+
+  function announceStep() {
+    var step = currentStep();
+    if (step.type === "rest") {
+      speak("Rest");
+      vibrate(100);
+    } else {
+      speak(EXERCISES[step.index]);
+      vibrate([100, 60, 100]);
+    }
+  }
+
+  function announceDone() {
+    speak("Workout complete. Nice work.");
+    vibrate([120, 80, 120, 80, 200]);
+  }
+
+  function requestWakeLock() {
+    try {
+      if ("wakeLock" in navigator) {
+        navigator.wakeLock.request("screen").then(function (lock) {
+          wakeLock = lock;
+        }).catch(function () {});
+      }
+    } catch (e) {}
+  }
+
+  function releaseWakeLock() {
+    if (wakeLock) {
+      try { wakeLock.release(); } catch (e) {}
+      wakeLock = null;
+    }
+  }
+
+  function scheduleTick() {
+    clearTimeout(tickHandle);
+    tickHandle = setTimeout(tick, 250);
+  }
+
+  function tick() {
+    if (state !== "running" && state !== "starting") return;
+    var remain = endAt - Date.now();
+    if (remain <= 0) {
+      if (state === "starting") {
+        state = "running";
+        stepIndex = 0;
+        announceStep();
+        beginStep();
+      } else {
+        advanceStep();
+      }
+      return;
+    }
+    var remainSecCeil = Math.ceil(remain / 1000);
+    if (remainSecCeil <= 3 && remainSecCeil >= 1 && remainSecCeil !== lastCountdownSecond) {
+      lastCountdownSecond = remainSecCeil;
+      countdownSpeak(remainSecCeil);
+    }
+    render();
+    scheduleTick();
+  }
+
+  function advanceStep() {
+    stepIndex++;
+    if (stepIndex >= sequence.length) {
+      state = "done";
+      releaseWakeLock();
+      announceDone();
+      render();
+      return;
+    }
+    announceStep();
+    beginStep();
+  }
+
+  function beginStep() {
+    var step = currentStep();
+    endAt = Date.now() + step.seconds * 1000;
+    lastCountdownSecond = null;
+    render();
+    scheduleTick();
+  }
+
+  function start() {
+    primeSpeech();
+    if (state === "idle") {
+      stepIndex = 0;
+      state = "starting";
+      lastCountdownSecond = null;
+      requestWakeLock();
+      endAt = Date.now() + PRESTART_SECONDS * 1000;
+      render();
+      scheduleTick();
+    } else if (state === "paused") {
+      state = pausedPhase;
+      pausedPhase = null;
+      endAt = Date.now() + remainingMs;
+      requestWakeLock();
+      render();
+      scheduleTick();
+    } else if (state === "running" || state === "starting") {
+      pausedPhase = state;
+      state = "paused";
+      remainingMs = endAt - Date.now();
+      clearTimeout(tickHandle);
+      releaseWakeLock();
+      try { speechSynthesis.cancel(); } catch (e) {}
+      render();
+    } else if (state === "done") {
+      reset();
+      start();
+    }
+  }
+
+  function reset() {
+    state = "idle";
+    stepIndex = 0;
+    remainingMs = 0;
+    pausedPhase = null;
+    clearTimeout(tickHandle);
+    releaseWakeLock();
+    try { speechSynthesis.cancel(); } catch (e) {}
+    render();
+  }
+
+  el.startBtn.addEventListener("click", start);
+  el.resetBtn.addEventListener("click", reset);
+
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "visible" && (state === "running" || state === "starting")) {
+      requestWakeLock();
+      render();
+    }
+  });
+
+  render();
+})();
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("sw.js").catch(function () {});
+  });
+}
+</script>
+</body>
+</html>
