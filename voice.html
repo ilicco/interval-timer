@@ -175,7 +175,7 @@
   var WORK_SECONDS = 60;
   var REST_SECONDS = 5;
   var PRESTART_SECONDS = 3;
-  var APP_VERSION = "1.1";
+  var APP_VERSION = "1.2";
   // -----------------------------------
 
   // Build the sequence: work, rest, work, rest, ..., work (no trailing rest)
@@ -287,7 +287,7 @@
     el.startBtn.disabled = false;
   }
 
-  var COUNTDOWN_WORDS = { 3: "Three", 2: "Two", 1: "One" };
+  var COUNTDOWN_WORDS = { 3: "Three", 2: "Too", 1: "One" };
 
   function primeSpeech() {
     // Must run synchronously inside a real user gesture (the Start tap) or
@@ -303,6 +303,7 @@
     try {
       var utter = new SpeechSynthesisUtterance(text);
       utter.rate = rate || 1;
+      utter.lang = "en-GB";
       if (speechSynthesis.speaking || speechSynthesis.pending) {
         // Cancelling and immediately speaking clips the start of the next
         // word on WebKit (e.g. "Two" comes out sounding like "do") — a
@@ -320,7 +321,7 @@
   }
 
   function countdownSpeak(n) {
-    speak(COUNTDOWN_WORDS[n], 0.9);
+    speak(COUNTDOWN_WORDS[n]);
     vibrate(40);
   }
 
