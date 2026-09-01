@@ -57,6 +57,13 @@
     min-height: 1.4em;
   }
 
+  #version {
+    font-size: 12px;
+    color: var(--muted);
+    opacity: 0.6;
+    min-height: 1.2em;
+  }
+
   #middle {
     flex: 1;
     display: flex;
@@ -135,6 +142,7 @@
 <body>
 <div id="app">
   <div id="progress">Ready</div>
+  <div id="version"></div>
 
   <div id="middle">
     <div id="label">Get Ready</div>
@@ -167,6 +175,7 @@
   var WORK_SECONDS = 60;
   var REST_SECONDS = 5;
   var PRESTART_SECONDS = 3;
+  var APP_VERSION = "1.0";
   // -----------------------------------
 
   // Build the sequence: work, rest, work, rest, ..., work (no trailing rest)
@@ -180,6 +189,7 @@
 
   var el = {
     progress: document.getElementById("progress"),
+    version: document.getElementById("version"),
     label: document.getElementById("label"),
     nextPreview: document.getElementById("next-preview"),
     time: document.getElementById("time"),
@@ -215,6 +225,7 @@
 
     if (state === "idle") {
       el.progress.textContent = "Ready — " + EXERCISES.length + " exercises";
+      el.version.textContent = "v" + APP_VERSION;
       el.label.textContent = "Get Ready";
       el.nextPreview.textContent = EXERCISES[0];
       el.time.textContent = fmt(WORK_SECONDS);
@@ -222,6 +233,8 @@
       el.startBtn.classList.remove("is-pause");
       return;
     }
+
+    el.version.textContent = "";
 
     if (state === "done") {
       el.body.classList.add("mode-done");
