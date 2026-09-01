@@ -225,7 +225,7 @@
 
     if (state === "idle") {
       el.progress.textContent = "Ready — " + EXERCISES.length + " exercises";
-      el.version.textContent = "v" + APP_VERSION;
+      el.version.textContent = "Beep v" + APP_VERSION;
       el.label.textContent = "Get Ready";
       el.nextPreview.textContent = EXERCISES[0];
       el.time.textContent = fmt(WORK_SECONDS);
@@ -451,13 +451,11 @@
   }
 
   function reset() {
-    state = "idle";
-    stepIndex = 0;
-    remainingMs = 0;
-    pausedPhase = null;
     clearTimeout(tickHandle);
     releaseWakeLock();
-    render();
+    // Reload so an online device picks up any update; the service worker
+    // falls back to the cached copy automatically if offline.
+    location.reload();
   }
 
   el.startBtn.addEventListener("click", start);

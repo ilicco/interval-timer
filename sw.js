@@ -1,5 +1,5 @@
 // Bump this when index.html or voice.html changes so the new version gets cached.
-var CACHE_NAME = "interval-timer-v6";
+var CACHE_NAME = "interval-timer-v7";
 var ASSETS = ["./", "./index.html", "./voice.html"];
 
 self.addEventListener("install", function (event) {
@@ -25,9 +25,20 @@ self.addEventListener("activate", function (event) {
 });
 
 self.addEventListener("fetch", function (event) {
+  // Network-first: always try to get the latest page when online (so a
+  // Reset-triggered reload picks up updates), falling back to the cached
+  // copy when offline.
   event.respondWith(
-    caches.match(event.request).then(function (cached) {
-      return cached || fetch(event.request);
-    })
+    fetch(event.request)
+      .then(function (response) {
+        var copy = response.clone();
+        caches.open(CACHE_NAME).then(function (cache) {
+          cache.put(event.request, copy);
+        });
+        return response;
+      })
+      .catch(function () {
+        return caches.match(event.request);
+      })
   );
 });
